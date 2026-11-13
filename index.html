@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Handfield">
+<meta name="theme-color" content="#05060a">
+<link rel="icon" href="data:,">
+<title>Handfield</title>
+<style>
+  :root{--line:rgba(255,255,255,.12);--text:#eef2ff;--muted:rgba(226,232,255,.62);--a1:#5fd4ff;--a2:#a78bff;--a3:#ff6fb5}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%;background:radial-gradient(120% 85% at 50% 10%,#111632 0%,#080a16 55%,#030308 100%) fixed;color:var(--text);
+    font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+  main{max-width:720px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 28px) calc(env(safe-area-inset-right) + 18px) calc(env(safe-area-inset-bottom) + 28px) calc(env(safe-area-inset-left) + 18px)}
+  .kicker{font-size:11px;font-weight:750;letter-spacing:.24em;text-transform:uppercase;background:linear-gradient(90deg,var(--a1),var(--a2),var(--a3));-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1{font:700 32px/1.1 -apple-system,"SF Pro Display",sans-serif;letter-spacing:-.022em;margin:10px 0 8px}
+  .lead{color:var(--muted);margin-bottom:22px}
+  .grid{display:grid;gap:10px}
+  @media (min-width:640px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  a.card{display:block;text-decoration:none;color:inherit;padding:16px 16px 15px;border-radius:20px;background:rgba(14,16,28,.66);border:1px solid var(--line);
+    -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);transition:transform .15s}
+  a.card:active{transform:scale(.985)}
+  a.card .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;padding:4px 8px;border-radius:999px;margin-bottom:10px;color:#090a12}
+  a.card b{display:block;font-size:17px;margin-bottom:4px}
+  a.card span{display:block;color:var(--muted);font-size:13px}
+  .t1{background:linear-gradient(135deg,var(--a1),var(--a2))}.t2{background:linear-gradient(135deg,var(--a2),var(--a3))}.t3{background:linear-gradient(135deg,#ffc46b,var(--a3))}
+  .extra{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .extra a{color:var(--text);text-decoration:none;font-size:13.5px;font-weight:600;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05)}
+  .note{margin-top:22px;color:var(--muted);font-size:13px}
+  .note b{color:var(--text)}
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">Handfield</div>
+  <h1>Light sculptures you shape with your hands</h1>
+  <p class="lead">Three ways to run it on iPhone. The two headset versions are made for a Zapbox.</p>
+  <div class="grid">
+    <a class="card" href="ar.html"><i class="tag t1">ZAPBOX · 6DoF</i><b>Walk around it</b><span>Rear camera, stereo, hand tracking. Anchored to the printed marker board so you can circle it.</span></a>
+    <a class="card" href="3dof.html"><i class="tag t2">ZAPBOX · 3DoF</i><b>Head turns only</b><span>Rear camera, stereo, hand tracking. Gyro only, no marker; hold both palms up to recenter.</span></a>
+    <a class="card" href="handheld.html"><i class="tag t3">HANDHELD</i><b>Phone in your hand</b><span>Front camera, hands in front of the screen. The original version, no headset.</span></a>
+  </div>
+  <div class="extra">
+    <a href="handfield-marker-board.pdf">Print the marker board (PDF)</a>
+  </div>
+  <p class="note"><b>Tip:</b> tap Share → <b>Add to Home Screen</b> on this page. Opened from the icon, the apps run full screen with no Safari bars over the Zapbox lenses. Lens calibration is shared between the two headset versions.</p>
+</main>
+</body>
+</html>

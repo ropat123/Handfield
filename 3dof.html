@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Handfield 3DoF">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="data:,">
+<title>Handfield 3DoF · Zapbox</title>
+<style>
+  :root{
+    --panel:rgba(12,14,24,.86); --line:rgba(255,255,255,.12); --text:#eef2ff; --muted:rgba(226,232,255,.62);
+    --a1:#5fd4ff; --a2:#a78bff; --a3:#ff6fb5;
+    --sat:env(safe-area-inset-top); --sab:env(safe-area-inset-bottom); --sal:env(safe-area-inset-left); --sar:env(safe-area-inset-right);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#000;color:var(--text);
+    font:14px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  button,select,input{font:inherit;color:inherit}
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+  #cam{position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
+
+  #rotate{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;text-align:center;padding:32px;background:#05060a}
+  #rotate b{display:block;font-size:20px;margin-bottom:8px}
+  #rotate p{color:var(--muted);max-width:300px}
+  @media (orientation:portrait){ #rotate{display:flex} }
+
+  #setup{position:fixed;inset:0;z-index:20;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+    padding:calc(var(--sat) + 12px) calc(var(--sar) + 14px) calc(var(--sab) + 12px) calc(var(--sal) + 14px);
+    background:linear-gradient(90deg,rgba(3,4,10,.94),rgba(3,4,10,.78));transition:opacity .3s}
+  #setup.hidden{opacity:0;pointer-events:none}
+  .cols{display:grid;grid-template-columns:minmax(260px,1fr) minmax(300px,1.15fr);gap:16px;max-width:980px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px 16px 14px}
+  .kicker{font-size:10.5px;font-weight:750;letter-spacing:.22em;text-transform:uppercase;
+    background:linear-gradient(90deg,var(--a1),var(--a2),var(--a3));-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1{font:700 21px/1.15 -apple-system,"SF Pro Display",sans-serif;letter-spacing:-.015em;margin:7px 0 10px}
+  ol{padding-left:18px;color:var(--muted);font-size:13px}
+  ol li{margin:3px 0} ol b{color:var(--text);font-weight:620}
+  .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .primary{flex:1 1 150px;height:44px;border:0;border-radius:13px;font-weight:680;color:#07080f;
+    background:linear-gradient(135deg,var(--a1),var(--a2) 55%,var(--a3))}
+  .ghost{flex:1 1 120px;height:44px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.06);font-weight:600}
+  .status{margin-top:10px;font:500 11.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+  .warn{display:none;margin-top:10px;padding:9px 11px;border-radius:11px;font-size:12.5px;
+    background:rgba(255,95,122,.12);border:1px solid rgba(255,95,122,.32);color:#ffd0d8}
+  .warn.show{display:block}
+  .tip{margin-top:10px;font-size:12px;color:var(--muted)}
+  h3{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:2px 0 6px}
+  section+section{margin-top:12px}
+  .row{display:grid;grid-template-columns:118px 1fr 58px;align-items:center;gap:8px;min-height:32px}
+  .row label{font-size:12.5px}
+  .row output{font:500 11.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);text-align:right}
+  input[type=range]{width:100%;accent-color:#9b8cff;height:28px}
+  .toggles{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}
+  .tg{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:10px;background:rgba(255,255,255,.06);font-size:12.5px}
+  .tg input{accent-color:#9b8cff}
+  select{background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:9px;padding:6px 8px}
+  .small{height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.06);padding:0 12px;font-size:12.5px;margin-top:10px}
+  @media (max-height:460px){ h1{font-size:18px} .card{padding:13px} }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<video id="cam" playsinline muted autoplay></video>
+
+<div id="rotate"><div><b>Turn your phone sideways</b><p>Handfield runs in landscape. If the screen won’t rotate, turn off Portrait Orientation Lock in Control Center.</p></div></div>
+
+<div id="setup">
+  <div class="cols">
+    <div class="card">
+      <div class="kicker">Handfield 3DoF · Zapbox</div>
+      <h1>A light sculpture that hangs in front of you, shaped by your hands</h1>
+      <ol>
+        <li><b>Start</b> and allow camera and motion access.</li>
+        <li>Optional: tune the lenses with the calibration grid.</li>
+        <li><b>Enter headset</b> and slide the phone into the Zapbox. Three seconds later the sculpture appears straight ahead.</li>
+        <li>Turn your head to look around it. Hold up <b>both open palms</b> for a second to bring it back in front of you.</li>
+      </ol>
+      <div class="btns">
+        <button class="primary" id="btnStart">Start</button>
+        <button class="ghost" id="btnHand">Handheld view</button>
+      </div>
+      <div class="status" id="status">Not started</div>
+      <div class="warn" id="warn"></div>
+      <p class="tip">Gestures: 🤏 pinch near it to spin · 🤏🤏 two-hand pinch to scale & turn · ✋ palm parts the particles · ✊ fist gathers, open to blast · ☝️ poke · hold ✌️ for the next shape. Head turns only (3DoF): leaning or walking won’t move it. Tap the screen any time to come back here.</p>
+    </div>
+    <div class="card" id="settings"></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =================================================================== config */
+const CFG = {
+  visionBundle: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs',
+  wasmBase:     'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm',
+  model:        'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+  particles: 14000,
+  camLatencyMs: 45,       // fallback camera latency when the browser gives no capture time
+  gyroPredictMs: 16,
+};
+const N = CFG.particles, TAU = Math.PI * 2, DEG = Math.PI / 180;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const $ = (id) => document.getElementById(id);
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }
+THREE.ColorManagement.enabled = false;
+
+/* ================================================================= settings */
+const KEY = 'handfield-ar-v1';
+const DEFAULTS = {
+  viewMM: 62, lensSepMM: 63, lensYMM: 0, k1: 0.22, k2: 0.1, ca: 0.006, ipdMM: 63, ppi: 460,
+  camera: 'main', hfovMain: 66, hfovUltra: 104,
+  sizeCM: 28, distCM: 60, skeleton: true, grid: false, mode: 'stereo',
+};
+let S = { ...DEFAULTS };
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch {}
+let saveTimer = 0;
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }, 300); }
+const hfovKey = () => (S.camera === 'ultra' ? 'hfovUltra' : 'hfovMain');
+
+const SPEC = [
+  ['Headset lenses', [
+    ['viewMM', 'View size', 'mm', 30, 95, 0.5],
+    ['lensSepMM', 'Lens spacing', 'mm', 50, 78, 0.5],
+    ['lensYMM', 'Lens height', 'mm', -15, 15, 0.5],
+    ['k1', 'Distortion k1', '', 0, 0.8, 0.01],
+    ['k2', 'Distortion k2', '', 0, 0.8, 0.01],
+    ['ipdMM', 'Eye separation', 'mm', 0, 80, 0.5],
+  ]],
+  ['Camera', [
+    ['hfov', 'Camera FOV', '°', 45, 125, 0.1],
+  ]],
+  ['Sculpture', [
+    ['sizeCM', 'Size', 'cm', 8, 120, 1],
+    ['distCM', 'Distance in front', 'cm', 25, 200, 1],
+  ]],
+];
+function buildSettings() {
+  const el = $('settings');
+  let h = '';
+  for (const [title, rows] of SPEC) {
+    h += `<section><h3>${title}</h3>`;
+    if (title === 'Headset lenses') h += `<div class="toggles"><label class="tg"><input type="checkbox" id="opt-grid"> Calibration grid</label></div>`;
+    if (title === 'Camera') h += `<div class="toggles"><label class="tg">Lens <select id="opt-camera"><option value="main">Main (1×)</option><option value="ultra">Ultra Wide (0.5×)</option></select></label></div>`;
+    if (title === 'Sculpture') h += `<div class="toggles"><label class="tg"><input type="checkbox" id="opt-skeleton"> Show hand skeleton</label></div>`;
+    for (const [k, label, , min, max, step] of rows) {
+      h += `<div class="row"><label for="s-${k}">${label}</label><input type="range" id="s-${k}" min="${min}" max="${max}" step="${step}"><output id="o-${k}"></output></div>`;
+    }
+    h += `</section>`;
+  }
+  h += `<button class="small" id="btnRecenter">Recenter in front of me</button> <button class="small" id="btnReset">Reset to defaults</button>`;
+  el.innerHTML = h;
+  for (const [, rows] of SPEC) for (const [k, , unit, , , step] of rows) {
+    const inp = $('s-' + k);
+    inp.addEventListener('input', () => {
+      const v = parseFloat(inp.value);
+      if (k === 'hfov') S[hfovKey()] = v;
+      else S[k] = v;
+      $('o-' + k).textContent = fmt(v, unit, step); onSettingsChanged(); save();
+    });
+  }
+  for (const k of ['grid', 'skeleton']) $('opt-' + k).addEventListener('change', (e) => { S[k] = e.target.checked; onSettingsChanged(); save(); });
+  $('opt-camera').addEventListener('change', (e) => { S.camera = e.target.value; save(); syncSettingsUI(); camDeviceId = null; if (camOn) openCamera().catch((err) => warn(String(err))); onSettingsChanged(); });
+  $('btnRecenter').addEventListener('click', () => { if (camOn) recenter(true); });
+  $('btnReset').addEventListener('click', () => { S = { ...DEFAULTS, mode: S.mode }; save(); syncSettingsUI(); onSettingsChanged(); });
+  syncSettingsUI();
+}
+const fmt = (v, unit, step) => (+v).toFixed(step < 0.1 ? 2 : step < 1 && (v % 1) ? 1 : 0) + (unit ? ' ' + unit : '');
+function syncSettingsUI() {
+  for (const [, rows] of SPEC) for (const [k, , unit, , , step] of rows) {
+    const v = k === 'hfov' ? S[hfovKey()] : S[k];
+    $('s-' + k).value = v; $('o-' + k).textContent = fmt(v, unit, step);
+  }
+  $('opt-grid').checked = S.grid; $('opt-skeleton').checked = S.skeleton; $('opt-camera').value = S.camera;
+}
+
+/* ================================================================== shapes */
+const tmpC = new THREE.Color();
+const hex = (h) => new THREE.Color(h);
+function put(P, C, i, x, y, z, col) { P[i * 3] = x; P[i * 3 + 1] = y; P[i * 3 + 2] = z; C[i * 3] = col.r; C[i * 3 + 1] = col.g; C[i * 3 + 2] = col.b; }
+function rot(P, ax, ay, az) {
+  const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(ax, ay, az)), v = new THREE.Vector3();
+  for (let i = 0; i < P.length; i += 3) { v.set(P[i], P[i + 1], P[i + 2]).applyMatrix4(m); P[i] = v.x; P[i + 1] = v.y; P[i + 2] = v.z; }
+}
+function galaxy(n) {
+  const P = new Float32Array(n * 3), C = new Float32Array(n * 3);
+  const core = hex('#ffe3b3'), mid = hex('#ff73bd'), out = hex('#58cfff'), dust = hex('#8c7bff');
+  for (let i = 0; i < n; i++) {
+    let r, a, y;
+    if (Math.random() < 0.16) { r = Math.abs(gauss()) * 0.15; a = Math.random() * TAU; y = gauss() * 0.07 * (1 - r); }
+    else { r = 0.07 + Math.pow(Math.random(), 0.9) * 0.98; a = (i % 3) * TAU / 3 + r * 3.4 + gauss() * (0.1 + 0.2 * r); y = gauss() * 0.03 * (1.3 - r); }
+    const t = clamp(r / 1.05, 0, 1);
+    if (t < 0.3) tmpC.copy(core).lerp(mid, t / 0.3); else tmpC.copy(mid).lerp(out, (t - 0.3) / 0.7);
+    if (Math.random() < 0.12) tmpC.lerp(dust, 0.6);
+    put(P, C, i, Math.cos(a) * r + gauss() * 0.02, y, Math.sin(a) * r + gauss() * 0.02, tmpC);
+  }
+  rot(P, 0.35, 0, 0.12);
+  return { pos: P, col: C };
+}
+function planet(n) {
+  const P = new Float32Array(n * 3), C = new Float32Array(n * 3);
+  const ns = Math.floor(n * 0.58), R = 0.5, golden = Math.PI * (3 - Math.sqrt(5));
+  const amber = hex('#ffb066'), coral = hex('#ff6f61'), cream = hex('#ffe9c9');
+  for (let i = 0; i < ns; i++) {
+    const y = 1 - (i + 0.5) / ns * 2, rr = Math.sqrt(1 - y * y), phi = i * golden, rad = R * (1 + gauss() * 0.01);
+    const band = Math.sin(y * 15 + Math.sin(phi * 2) * 0.35) * 0.5 + 0.5;
+    tmpC.copy(coral).lerp(amber, band).lerp(cream, Math.pow(Math.abs(Math.sin(y * 6.5)), 6) * 0.8).multiplyScalar(0.75 + 0.25 * (1 - Math.abs(y)));
+    put(P, C, i, Math.cos(phi) * rr * rad, y * rad, Math.sin(phi) * rr * rad, tmpC);
+  }
+  const ice = hex('#d4ecff'), blue = hex('#7fa8ff');
+  for (let i = ns; i < n; i++) {
+    let r; do { r = 0.68 + Math.sqrt(Math.random()) * 0.36; } while (r > 0.855 && r < 0.885);
+    const a = Math.random() * TAU;
+    tmpC.copy(blue).lerp(ice, (r - 0.68) / 0.36).multiplyScalar(r > 0.96 ? 0.6 : 0.95);
+    put(P, C, i, Math.cos(a) * r, gauss() * 0.008, Math.sin(a) * r, tmpC);
+  }
+  rot(P, 0.3, 0, 0.22);
+  return { pos: P, col: C };
+}
+function knot(n) {
+  const P = new Float32Array(n * 3), C = new Float32Array(n * 3);
+  const stops = ['#5fd4ff', '#a78bff', '#ff6fb5', '#ffc46b'].map(hex);
+  for (let i = 0; i < n; i++) {
+    const t = Math.random() * TAU, r = Math.cos(3 * t) + 2, u = ((t / TAU) * 2) % 1 * 4, k = Math.floor(u);
+    tmpC.copy(stops[k % 4]).lerp(stops[(k + 1) % 4], u - k);
+    put(P, C, i, r * Math.cos(2 * t) * 0.33 + gauss() * 0.05, r * Math.sin(2 * t) * 0.33 + gauss() * 0.05, -Math.sin(3 * t) * 0.33 + gauss() * 0.05, tmpC);
+  }
+  rot(P, 0.5, 0.3, 0);
+  return { pos: P, col: C };
+}
+function helix(n) {
+  const P = new Float32Array(n * 3), C = new Float32Array(n * 3);
+  const turns = 2.3, R = 0.4, rungs = 28, sA = hex('#5fd4ff'), sB = hex('#a78bff');
+  const pairs = [['#ffc46b', '#5df2a4'], ['#ff6fb5', '#5fd4ff'], ['#5df2a4', '#ffc46b'], ['#5fd4ff', '#ff6fb5']].map((p) => p.map(hex));
+  for (let i = 0; i < n; i++) {
+    if (Math.random() < 0.62) {
+      const s = i & 1, t = Math.random(), a = t * TAU * turns + s * Math.PI;
+      tmpC.copy(s ? sB : sA).multiplyScalar(0.8 + Math.random() * 0.3);
+      put(P, C, i, Math.cos(a) * R + gauss() * 0.022, (t - 0.5) * 2 + gauss() * 0.022, Math.sin(a) * R + gauss() * 0.022, tmpC);
+    } else {
+      const k = Math.floor(Math.random() * rungs), t = (k + 0.5) / rungs, a = t * TAU * turns, s = Math.random();
+      tmpC.copy(pairs[k % 4][s < 0.5 ? 0 : 1]);
+      put(P, C, i, Math.cos(a) * R * (1 - 2 * s) + gauss() * 0.012, (t - 0.5) * 2 + gauss() * 0.012, Math.sin(a) * R * (1 - 2 * s) + gauss() * 0.012, tmpC);
+    }
+  }
+  return { pos: P, col: C };
+}
+function tesseract(n) {
+  const P = new Float32Array(n * 3), C = new Float32Array(n * 3);
+  const V = [];
+  for (const s of [0.64, 0.3]) for (let b = 0; b < 8; b++) V.push([(b & 1 ? 1 : -1) * s, (b & 2 ? 1 : -1) * s, (b & 4 ? 1 : -1) * s]);
+  const E = [];
+  for (const base of [0, 8]) for (let a = 0; a < 8; a++) for (let b = a + 1; b < 8; b++) { const x = a ^ b; if (x === 1 || x === 2 || x === 4) E.push([base + a, base + b, base ? 1 : 0]); }
+  for (let a = 0; a < 8; a++) E.push([a, a + 8, 2]);
+  const len = E.map(([a, b]) => Math.hypot(V[a][0] - V[b][0], V[a][1] - V[b][1], V[a][2] - V[b][2]));
+  const total = len.reduce((s, l) => s + l, 0), outer = hex('#5fd4ff'), inner = hex('#ff6fb5'), node = hex('#f4f0ff');
+  for (let i = 0; i < n; i++) {
+    if (Math.random() < 0.08) { const v = V[Math.floor(Math.random() * 16)]; put(P, C, i, v[0] + gauss() * 0.028, v[1] + gauss() * 0.028, v[2] + gauss() * 0.028, node); continue; }
+    let pick = Math.random() * total, e = 0; while (pick > len[e]) pick -= len[e++];
+    const [a, b, kind] = E[Math.min(e, E.length - 1)], t = Math.random(), A = V[a], B = V[b];
+    if (kind === 0) tmpC.copy(outer); else if (kind === 1) tmpC.copy(inner); else tmpC.copy(outer).lerp(inner, t);
+    put(P, C, i, A[0] + (B[0] - A[0]) * t + gauss() * 0.012, A[1] + (B[1] - A[1]) * t + gauss() * 0.012, A[2] + (B[2] - A[2]) * t + gauss() * 0.012, tmpC);
+  }
+  rot(P, 0.55, 0.65, 0.1);
+  return { pos: P, col: C };
+}
+const SHAPES = [
+  { name: 'Galaxy', ...galaxy(N) }, { name: 'Planet', ...planet(N) }, { name: 'Knot', ...knot(N) },
+  { name: 'Helix', ...helix(N) }, { name: 'Tesseract', ...tesseract(N) },
+];
+
+/* ================================================================== three */
+const canvas = $('gl'), video = $('cam');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' });
+const PR = Math.min(window.devicePixelRatio || 1, 3);
+renderer.setPixelRatio(PR);
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+renderer.autoClear = false;
+renderer.setClearColor(0x000000, 1);
+
+const scene = new THREE.Scene();
+const rig = new THREE.Object3D();           // = the physical rear camera, in board (world) coordinates, metres
+scene.add(rig);
+const camC = new THREE.PerspectiveCamera(40, 16 / 9, 0.02, 30);   // handheld view
+const camL = new THREE.PerspectiveCamera(40, 16 / 9, 0.02, 30);
+const camR = new THREE.PerspectiveCamera(40, 16 / 9, 0.02, 30);
+rig.add(camC, camL, camR);
+
+const videoTex = new THREE.VideoTexture(video);
+videoTex.minFilter = THREE.LinearFilter; videoTex.magFilter = THREE.LinearFilter; videoTex.generateMipmaps = false;
+const videoPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ map: videoTex, color: 0xe6e6e6, depthTest: false, depthWrite: false }));
+videoPlane.renderOrder = -10; videoPlane.frustumCulled = false; videoPlane.visible = false;
+// The passthrough plane hangs off the camera pose *at capture time* of the frame on screen, while the eyes use the
+// predicted current pose: video and virtual content stay registered, and the video is reprojected for head motion.
+const videoRig = new THREE.Object3D(); scene.add(videoRig); videoRig.add(videoPlane);
+let videoDist = 0.6, videoTc = 0;
+
+/* --- particles */
+const sculpt = new THREE.Group(); sculpt.visible = false; scene.add(sculpt);
+const pos = new Float32Array(N * 3), vel = new Float32Array(N * 3), colOut = new Float32Array(N * 3), colBase = new Float32Array(N * 3);
+const stiff = new Float32Array(N), seeds = new Float32Array(N), sizes = new Float32Array(N);
+let shapeIdx = 0, tgt = SHAPES[0].pos, colTgt = SHAPES[0].col;
+for (let i = 0; i < N; i++) {
+  const r = 1.5 + Math.random() * 1.5, th = Math.random() * TAU, ph = Math.acos(2 * Math.random() - 1);
+  pos[i * 3] = r * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = r * Math.cos(ph); pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+  stiff[i] = 0.55 + Math.random() * 0.9; seeds[i] = Math.random(); sizes[i] = 0.55 + Math.pow(Math.random(), 3) * 1.4;
+}
+const pGeo = new THREE.BufferGeometry();
+const posAttr = new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage);
+const colAttr = new THREE.BufferAttribute(colOut, 3).setUsage(THREE.DynamicDrawUsage);
+pGeo.setAttribute('position', posAttr); pGeo.setAttribute('aColor', colAttr);
+pGeo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1)); pGeo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+const pMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uSize: { value: 3 }, uGain: { value: 0.85 } },
+  vertexShader: `attribute vec3 aColor; attribute float aSize; attribute float aSeed; uniform float uTime; uniform float uSize;
+    varying vec3 vColor; varying float vTw;
+    void main(){ vec3 p = position + 0.010 * vec3(sin(uTime*1.3+aSeed*41.0), sin(uTime*1.1+aSeed*29.0), sin(uTime*0.9+aSeed*17.0));
+      vec4 mv = modelViewMatrix * vec4(p,1.0); gl_Position = projectionMatrix * mv;
+      gl_PointSize = max(1.5, aSize * uSize / -mv.z); vColor = aColor; vTw = 0.72 + 0.28*sin(uTime*(1.2+aSeed*2.5)+aSeed*80.0); }`,
+  fragmentShader: `uniform float uGain; varying vec3 vColor; varying float vTw;
+    void main(){ float d = length(gl_PointCoord-0.5)*2.0; if (d>1.0) discard;
+      gl_FragColor = vec4((vColor*pow(1.0-d,2.4) + vec3(smoothstep(0.32,0.0,d))*0.28)*vTw*uGain, 1.0); }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+});
+const points = new THREE.Points(pGeo, pMat); points.frustumCulled = false; sculpt.add(points);
+
+
+/* --- hands */
+const CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
+const TIPS = [4, 8, 12, 16, 20], PALM = [0, 5, 9, 13, 17];
+const GCOL = { none: hex('#e9f3ff'), pinch: hex('#ffc46b'), palm: hex('#5fd4ff'), fist: hex('#ff5fa8'), point: hex('#b49aff'), peace: hex('#7dffb0') };
+const jointGeo = new THREE.SphereGeometry(1, 12, 8), boneGeo = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true);
+const glowMat = () => new THREE.ShaderMaterial({
+  uniforms: { uColor: { value: new THREE.Color() }, uOpacity: { value: 0 }, uPx: { value: 900 } },
+  vertexShader: `attribute float aSize; uniform float uPx; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); gl_Position = projectionMatrix*mv; gl_PointSize = aSize*uPx / -mv.z; }`,
+  fragmentShader: `uniform vec3 uColor; uniform float uOpacity; void main(){ float d = length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard; gl_FragColor = vec4(uColor*pow(1.0-d,2.0)*uOpacity,1.0); }`,
+  transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+});
+const ringMat = () => new THREE.ShaderMaterial({
+  uniforms: { uP: { value: 0 }, uColor: { value: new THREE.Color('#7dffb0') }, uOpacity: { value: 1 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `varying vec2 vUv; uniform float uP; uniform vec3 uColor; uniform float uOpacity;
+    void main(){ vec2 c = vUv-0.5; float r = length(c)*2.0; if (r<0.74||r>1.0) discard; float a = fract(atan(c.x,c.y)/6.2831853+1.0);
+      gl_FragColor = vec4((a < uP ? uColor : vec3(0.35)) * uOpacity, 1.0); }`,
+  transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+});
+function makeHandVis() {
+  const mat = () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+  const jointMat = mat(), boneMat = mat();
+  const joints = new THREE.InstancedMesh(jointGeo, jointMat, 21), bones = new THREE.InstancedMesh(boneGeo, boneMat, CONN.length);
+  const gGeo = new THREE.BufferGeometry();
+  gGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(18), 3).setUsage(THREE.DynamicDrawUsage));
+  const gSize = new THREE.BufferAttribute(new Float32Array([0.016, 0.016, 0.016, 0.016, 0.016, 0.04]), 1).setUsage(THREE.DynamicDrawUsage);
+  gGeo.setAttribute('aSize', gSize);
+  const gMat = glowMat(), glow = new THREE.Points(gGeo, gMat);
+  const pinchRing = new THREE.Mesh(new THREE.RingGeometry(0.011, 0.015, 40), new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+  const peace = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.05), ringMat());
+  for (const o of [joints, bones, glow, pinchRing, peace]) { o.frustumCulled = false; o.visible = false; scene.add(o); }
+  glow.renderOrder = 9; bones.renderOrder = 10; joints.renderOrder = 11; pinchRing.renderOrder = 12; peace.renderOrder = 13;
+  return { joints, bones, glow, pinchRing, peace, jointMat, boneMat, gMat, gGeo, gSize };
+}
+class OneEuro {
+  constructor(minCutoff = 1.5, beta = 0.5, dCutoff = 1) { this.mc = minCutoff; this.beta = beta; this.dc = dCutoff; this.reset(); }
+  reset() { this.x = null; this.dx = 0; this.t = 0; }
+  static a(cut, dt) { const tau = 1 / (TAU * cut); return 1 / (1 + tau / dt); }
+  filter(v, t) {
+    if (this.x === null) { this.x = v; this.t = t; return v; }
+    const dt = Math.max(1e-3, t - this.t); this.t = t;
+    this.dx += OneEuro.a(this.dc, dt) * ((v - this.x) / dt - this.dx);
+    this.x += OneEuro.a(this.mc + this.beta * Math.abs(this.dx), dt) * (v - this.x);
+    return this.x;
+  }
+}
+function makeSlot(i) {
+  const v3 = () => Array.from({ length: 21 }, () => new THREE.Vector3());
+  return {
+    i, present: false, lastSeen: 0, visA: 0, fresh: true,
+    filt: Array.from({ length: 63 }, () => new OneEuro(2.2, 2.0)),
+    m: v3(),        // metric points in camera frame (for gesture shape)
+    tgt: v3(), disp: v3(),
+    pinch: false, gesture: 'none', cand: 'none', candN: 0, fistSince: 0, peaceSince: 0, peaceFired: false,
+    col: new THREE.Color(0xffffff), vis: makeHandVis(),
+  };
+}
+const slots = [makeSlot(0), makeSlot(1)];
+
+/* --- head-locked HUD (rendered in both eyes) */
+const hudCanvas = document.createElement('canvas'); hudCanvas.width = 1024; hudCanvas.height = 160;
+const hudCtx = hudCanvas.getContext('2d'), hudTex = new THREE.CanvasTexture(hudCanvas);
+const hud = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.05), new THREE.MeshBasicMaterial({ map: hudTex, transparent: true, depthTest: false, depthWrite: false }));
+hud.renderOrder = 30; hud.position.set(0, -0.115, -0.55); hud.visible = false; rig.add(hud);
+let hudText = '';
+function setHud(text) {
+  if (text === hudText) return; hudText = text; hud.visible = !!text; if (!text) return;
+  const c = hudCtx; c.clearRect(0, 0, 1024, 160);
+  c.font = '600 54px -apple-system, "SF Pro Text", Helvetica, sans-serif';
+  const w = Math.min(1000, c.measureText(text).width + 90), x = (1024 - w) / 2;
+  c.fillStyle = 'rgba(10,12,22,0.72)'; c.beginPath(); c.roundRect(x, 20, w, 120, 60); c.fill();
+  c.fillStyle = '#eef2ff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, 512, 82);
+  hudTex.needsUpdate = true;
+}
+let toastText = '', toastUntil = 0;
+function toast(text, ms = 1300) { toastText = text; toastUntil = performance.now() + ms; }
+
+/* --- stereo post pass: lens pre-distortion */
+const rtOpts = { depthBuffer: true, generateMipmaps: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
+const rtL = new THREE.WebGLRenderTarget(16, 9, rtOpts), rtR = new THREE.WebGLRenderTarget(16, 9, rtOpts);
+const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const distortFS = `
+  uniform sampler2D tEye; uniform vec2 uCenter; uniform float uScalePx, uAspect, uK1, uK2, uCA, uGrid;
+  vec2 src(vec2 d, float s){ float r2 = dot(d,d); vec2 q = d*(1.0+uK1*r2+uK2*r2*r2)*s; return vec2(0.5+0.5*q.x, 0.5+0.5*q.y*uAspect); }
+  void main(){
+    vec2 d = (gl_FragCoord.xy - uCenter) / uScalePx;
+    vec2 uv = src(d, 1.0);
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.0,0.0,0.0,1.0); return; }
+    vec3 col = vec3(texture2D(tEye, src(d, 1.0-uCA)).r, texture2D(tEye, uv).g, texture2D(tEye, src(d, 1.0+uCA)).b);
+    vec2 e = min(uv, 1.0-uv); col *= smoothstep(0.0, 0.025, min(e.x, e.y/uAspect));
+    if (uGrid > 0.5) {
+      vec2 gg = uv*vec2(16.0, 9.0); vec2 g = abs(fract(gg+0.5)-0.5)/max(fwidth(gg), vec2(1e-4));
+      float line = 1.0 - min(min(g.x, g.y), 1.0);
+      col = mix(col*0.35, vec3(0.35,1.0,0.6), line);
+      float rc = length(gl_FragCoord.xy - uCenter)/uScalePx;
+      col = mix(col, vec3(1.0,0.25,0.35), 1.0 - smoothstep(0.006, 0.014, abs(rc-0.06)));
+    }
+    gl_FragColor = vec4(col, 1.0);
+  }`;
+function makeEyeQuad(rt, x0) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 2), new THREE.ShaderMaterial({
+    uniforms: { tEye: { value: rt.texture }, uCenter: { value: new THREE.Vector2() }, uScalePx: { value: 500 }, uAspect: { value: 16 / 9 },
+      uK1: { value: 0 }, uK2: { value: 0 }, uCA: { value: 0 }, uGrid: { value: 0 } },
+    vertexShader: `void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }`, fragmentShader: distortFS, depthTest: false, depthWrite: false,
+  }));
+  m.geometry.translate(x0, 0, 0); m.frustumCulled = false; postScene.add(m); return m;
+}
+const quadL = makeEyeQuad(rtL, -0.5), quadR = makeEyeQuad(rtR, 0.5);
+
+/* ============================================================ camera model */
+let vw = 1280, vh = 720, fx = 985, cx = 640, cy = 360, vfovDeg = 40, hfovDeg = 66;
+let W = 1, H = 1, pxPerMM = 18, pxPerUnitEye = 900, pxPerUnitMono = 900;
+function updateIntrinsics() {
+  if (video.videoWidth) { vw = video.videoWidth; vh = video.videoHeight; }
+  hfovDeg = S[hfovKey()];
+  fx = (Math.max(vw, vh) / 2) / Math.tan(hfovDeg / 2 * DEG);
+  cx = vw / 2; cy = vh / 2;
+  vfovDeg = 2 * Math.atan((vh / 2) / fx) / DEG;
+  const aspect = vw / vh;
+  for (const c of [camL, camR]) { c.fov = vfovDeg; c.aspect = aspect; c.updateProjectionMatrix(); }
+  camL.position.x = -S.ipdMM / 2000; camR.position.x = S.ipdMM / 2000;
+  const sa = W / H;
+  camC.aspect = sa; camC.fov = sa > aspect ? 2 * Math.atan(Math.tan(vfovDeg / 2 * DEG) * aspect / sa) / DEG : vfovDeg; camC.updateProjectionMatrix();
+  layoutEyes();
+}
+function layoutEyes() {
+  const cw = Math.round(W * PR), ch = Math.round(H * PR);
+  pxPerMM = S.ppi / 25.4 * (PR / (window.devicePixelRatio || 1));
+  const imgW = S.viewMM * pxPerMM, aspect = vw / vh;
+  const EW = Math.round(clamp(imgW * 1.25, 480, 2048)), EH = Math.round(EW / aspect);
+  if (rtL.width !== EW || rtL.height !== EH) { rtL.setSize(EW, EH); rtR.setSize(EW, EH); }
+  pxPerUnitEye = EH / (2 * Math.tan(vfovDeg / 2 * DEG));
+  pxPerUnitMono = ch / (2 * Math.tan(camC.fov / 2 * DEG));
+  const sep = S.lensSepMM * pxPerMM, yc = ch / 2 + S.lensYMM * pxPerMM;
+  for (const [q, xc] of [[quadL, cw / 2 - sep / 2], [quadR, cw / 2 + sep / 2]]) {
+    const u = q.material.uniforms;
+    u.uCenter.value.set(xc, yc); u.uScalePx.value = imgW / 2; u.uAspect.value = aspect;
+    u.uK1.value = S.k1; u.uK2.value = S.k2; u.uCA.value = S.ca; u.uGrid.value = S.grid ? 1 : 0;
+  }
+}
+function resize() { W = window.innerWidth; H = window.innerHeight; renderer.setSize(W, H, false); updateIntrinsics(); }
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 300));
+
+function onSettingsChanged() {
+  updateIntrinsics();
+}
+
+/* ======================================================= 3DoF head (gyro only) */
+function solveLinear(A, b, n) { // Gaussian elimination with partial pivoting; A is n*n row-major (copied)
+  const M = Float64Array.from(A), x = Float64Array.from(b);
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r * n + c]) > Math.abs(M[p * n + c])) p = r;
+    if (Math.abs(M[p * n + c]) < 1e-12) return null;
+    if (p !== c) { for (let k = 0; k < n; k++) { const t = M[c * n + k]; M[c * n + k] = M[p * n + k]; M[p * n + k] = t; } const t = x[c]; x[c] = x[p]; x[p] = t; }
+    for (let r = c + 1; r < n; r++) { const f = M[r * n + c] / M[c * n + c]; if (!f) continue; for (let k = c; k < n; k++) M[r * n + k] -= f * M[c * n + k]; x[r] -= f * x[c]; }
+  }
+  for (let r = n - 1; r >= 0; r--) { let s = x[r]; for (let k = r + 1; k < n; k++) s -= M[r * n + k] * x[k]; x[r] = s / M[r * n + r]; }
+  return x;
+}
+const GH = []; let gyroOk = false, gyroPerm = 'unknown';
+const zee = new THREE.Vector3(0, 0, 1), eulerG = new THREE.Euler(), q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+function deviceQuat(out, a, b, g, orient) { eulerG.set(b, a, -g, 'YXZ'); out.setFromEuler(eulerG); out.multiply(q1); out.multiply(q0.setFromAxisAngle(zee, -orient)); return out; }
+const screenAngle = () => ((screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : (window.orientation || 0)) * DEG;
+const _dq = new THREE.Quaternion(), _ax = new THREE.Vector3();
+function histAt(hist, t, out, maxAheadMs) { // interpolate a {t,q} history; extrapolate a little past the end at the last angular velocity
+  const n = hist.length; if (!n) return null;
+  const L = hist[n - 1];
+  if (t >= L.t) {
+    if (n < 2) return out.copy(L.q);
+    const P = hist[n - 2], span = L.t - P.t; if (span <= 0) return out.copy(L.q);
+    _dq.copy(P.q).invert().multiply(L.q);
+    const ang = 2 * Math.acos(clamp(_dq.w, -1, 1)), k = clamp(t - L.t, 0, maxAheadMs) / span;
+    if (ang < 1e-6 || ang > 0.35) return out.copy(L.q);   // ignore implausible jumps instead of amplifying them
+    _ax.set(_dq.x, _dq.y, _dq.z).normalize(); _dq.setFromAxisAngle(_ax, ang * k);
+    return out.copy(L.q).multiply(_dq);
+  }
+  if (t <= hist[0].t) return out.copy(hist[0].q);
+  let i = n - 2; while (i > 0 && hist[i].t > t) i--;
+  const A = hist[i], B = hist[i + 1];
+  return out.copy(A.q).slerp(B.q, (t - A.t) / Math.max(1e-3, B.t - A.t));
+}
+function pushHist(hist, t, q, max) {
+  const last = hist[hist.length - 1]; if (last && t <= last.t) return;
+  if (last && last.q.dot(q) < 0) { q.x = -q.x; q.y = -q.y; q.z = -q.z; q.w = -q.w; }
+  hist.push({ t, q }); if (hist.length > max) hist.shift();
+}
+function onOrientation(e) {
+  if (e.alpha == null && e.beta == null) return;
+  const now = performance.now(), ts = e.timeStamp > now - 200 && e.timeStamp <= now + 5 ? e.timeStamp : now;
+  pushHist(GH, ts, deviceQuat(new THREE.Quaternion(), (e.alpha || 0) * DEG, (e.beta || 0) * DEG, (e.gamma || 0) * DEG, screenAngle()), 120);
+  gyroOk = true;
+}
+const gyroAt = (t, out) => histAt(GH, t, out, 25);
+
+// No motion data (desktop, or permission denied): drag the view instead.
+const manual = { yaw: 0, pitch: 0 }, _eul = new THREE.Euler(0, 0, 0, 'YXZ');
+const NECK = new THREE.Vector3(0, 0.07, -0.11);   // rear camera relative to the neck pivot (pivot = world origin)
+function headRotAt(t, out) {
+  if (gyroOk && gyroAt(t, out)) return out;
+  return out.setFromEuler(_eul.set(manual.pitch, manual.yaw, 0, 'YXZ'));
+}
+function camPoseAt(t, qOut, pOut) { headRotAt(t, qOut); pOut.copy(NECK).applyQuaternion(qOut); }
+function updateHead(now) { camPoseAt(now + CFG.gyroPredictMs, rig.quaternion, rig.position); }
+
+// The sculpture is placed straight ahead and stays put in that direction while you turn your head.
+const anchor = new THREE.Vector3(0, 0, -0.6), _rq = new THREE.Quaternion(), _rp = new THREE.Vector3();
+let placed = false, recenterAt = 0, camStartT = 0;
+function recenter(snap = false) {
+  camPoseAt(performance.now(), _rq, _rp);
+  anchor.copy(_rp).addScaledVector(_fwd.set(0, 0, -1).applyQuaternion(_rq), S.distCM / 100);
+  if (!placed || snap) { sculpt.position.copy(anchor); for (let i = 0; i < N * 3; i++) { pos[i] = gauss() * 1.6; vel[i] = 0; } }
+  placed = true;
+}
+const _fwd = new THREE.Vector3();
+
+/* ============================================================ hand tracking */
+let vision = null, fileset = null, landmarker = null, delegate = 'GPU', lastTs = 0, handCount = 0;
+async function createLandmarker(d) {
+  return vision.HandLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: CFG.model, delegate: d }, runningMode: 'VIDEO', numHands: 2,
+    minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5,
+  });
+}
+async function loadVision() {
+  vision = await import(CFG.visionBundle);
+  fileset = await vision.FilesetResolver.forVisionTasks(CFG.wasmBase);
+  try { landmarker = await createLandmarker(delegate); }
+  catch (e) { console.warn('GPU delegate failed, using CPU', e); delegate = 'CPU'; landmarker = await createLandmarker('CPU'); }
+  return landmarker;
+}
+let visionReady = null;
+
+const _hq = new THREE.Quaternion(), _hp = new THREE.Vector3(), _pt = new THREE.Vector3();
+function solveHandT(lm, wl) { // translation of MediaPipe's metric hand (world landmarks) in the OpenCV camera frame
+  let a00 = 0, a02 = 0, a11 = 0, a12 = 0, a22 = 0, b0 = 0, b1 = 0, b2 = 0;
+  for (let k = 0; k < 21; k++) {
+    const u = lm[k].x * vw - cx, v = lm[k].y * vh - cy, X = wl[k].x, Y = wl[k].y, Z = wl[k].z;
+    const r1 = u * Z - fx * X, r2 = v * Z - fx * Y;      // rows: [fx, 0, -u] and [0, fx, -v]
+    a00 += fx * fx; a02 += -fx * u; a22 += u * u + v * v; a11 += fx * fx; a12 += -fx * v;
+    b0 += fx * r1; b1 += fx * r2; b2 += -u * r1 - v * r2;
+  }
+  const T = solveLinear([a00, 0, a02, 0, a11, a12, a02, a12, a22], [b0, b1, b2], 3);
+  return T && T[2] > 0.08 && T[2] < 2 ? T : null;
+}
+function processHands(res, tc) {
+  const lmsAll = res.landmarks || [], wlsAll = res.worldLandmarks || [];
+  camPoseAt(tc, _hq, _hp);
+  const det = [];
+  for (let h = 0; h < Math.min(2, lmsAll.length); h++) {
+    const lm = lmsAll[h], wl = wlsAll[h]; if (!wl || wl.length < 21) continue;
+    const T = solveHandT(lm, wl); if (!T) continue;
+    const wp = [], mp = [];
+    for (let k = 0; k < 21; k++) {
+      const x = wl[k].x + T[0], y = wl[k].y + T[1], z = wl[k].z + T[2];
+      mp.push([x, y, z]);
+      _pt.set(x, -y, -z).applyQuaternion(_hq).add(_hp); wp.push([_pt.x, _pt.y, _pt.z]);
+    }
+    det.push({ wp, mp });
+  }
+  assignHands(det, tc / 1000);
+}
+function assignHands(det, t) {
+  const dist = (d, s) => (s.present ? Math.hypot(d.wp[0][0] - s.tgt[0].x, d.wp[0][1] - s.tgt[0].y, d.wp[0][2] - s.tgt[0].z) : 0);
+  let map = [];
+  if (det.length === 1) {
+    const [a, b] = slots;
+    if (a.present && b.present) map = [dist(det[0], a) <= dist(det[0], b) ? 0 : 1];
+    else if (a.present) map = [dist(det[0], a) < 0.25 ? 0 : 1];
+    else if (b.present) map = [dist(det[0], b) < 0.25 ? 1 : 0];
+    else map = [0];
+  } else if (det.length === 2) {
+    map = dist(det[0], slots[0]) + dist(det[1], slots[1]) <= dist(det[0], slots[1]) + dist(det[1], slots[0]) ? [0, 1] : [1, 0];
+  }
+  det.forEach((d, i) => updateSlot(slots[map[i]], d, t));
+  for (const s of slots) if (s.present && t - s.lastSeen > 0.25) { s.present = false; s.gesture = 'none'; s.pinch = false; }
+  handCount = slots.filter((s) => s.present).length;
+}
+function updateSlot(s, d, t) {
+  if (!s.present) { for (const f of s.filt) f.reset(); s.fresh = true; s.gesture = 'none'; s.cand = 'none'; s.candN = 0; s.pinch = false; }
+  for (let k = 0; k < 21; k++) {
+    s.tgt[k].set(s.filt[k * 3].filter(d.wp[k][0], t), s.filt[k * 3 + 1].filter(d.wp[k][1], t), s.filt[k * 3 + 2].filter(d.wp[k][2], t));
+    s.m[k].set(d.mp[k][0], d.mp[k][1], d.mp[k][2]);
+  }
+  s.present = true; s.lastSeen = t;
+  classify(s, t);
+  if (s.fresh) { for (let k = 0; k < 21; k++) s.disp[k].copy(s.tgt[k]); s.fresh = false; }
+}
+function classify(s, t) {
+  const m = s.m, d = (a, b) => m[a].distanceTo(m[b]);
+  const size = Math.max(d(0, 9), 1e-3);
+  const ratios = [[8, 6], [12, 10], [16, 14], [20, 18]].map(([tip, pip]) => d(0, tip) / Math.max(d(0, pip), 1e-3));
+  const ext = (r) => r > 1.17, curl = (r) => r < 1.0, fist = ratios.every(curl), pd = d(4, 8) / size;
+  s.pinch = !fist && (s.pinch ? pd < 0.5 : pd < 0.32);
+  let g = 'none';
+  if (s.pinch) g = 'pinch';
+  else if (fist) g = 'fist';
+  else if (ratios.every(ext)) g = 'palm';
+  else if (ext(ratios[0]) && ext(ratios[1]) && curl(ratios[2]) && curl(ratios[3])) g = 'peace';
+  else if (ext(ratios[0]) && curl(ratios[1]) && curl(ratios[2]) && curl(ratios[3])) g = 'point';
+  if (g === s.cand) s.candN++; else { s.cand = g; s.candN = 1; }
+  if (s.gesture !== g && s.candN >= (g === 'pinch' || s.gesture === 'pinch' ? 1 : 2)) setGesture(s, g, t);
+}
+const LABEL = { pinch: 'Pinch · move to spin', palm: 'Open palm · part the field', fist: 'Fist · gathering… open to blast', point: 'Point · poke', peace: 'Hold ✌️ · next shape', two: 'Two hands · stretch & turn', blast: 'Blast!' };
+let lastAnn = '', lastAnnT = 0;
+function announce(k, t) { if (k === lastAnn && t - lastAnnT < 2.5) return; lastAnn = k; lastAnnT = t; toast(LABEL[k]); }
+const blasts = [];
+function setGesture(s, g, t) {
+  const prev = s.gesture; s.gesture = g;
+  if (prev === 'fist' && g !== 'pinch' && t - s.fistSince > 0.35) { blasts.push({ s, power: clamp((t - s.fistSince) / 1.2, 0.5, 1.4) }); announce('blast', t); }
+  if (g === 'fist') s.fistSince = t;
+  if (g === 'peace') { s.peaceSince = t; s.peaceFired = false; }
+  if (g !== 'none' && prev !== 'fist') announce(g, t);
+}
+
+/* ======================================================= frame processing */
+let camOn = false, stream = null, camDeviceId = null, frameToken = 0, camFrames = 0;
+function onVideoFrame(now, meta) {
+  camFrames++;
+  const tc = meta && typeof meta.captureTime === 'number' && meta.captureTime > 0 && meta.captureTime <= now + 5 ? meta.captureTime : now - CFG.camLatencyMs;
+  videoTc = tc;
+  if (vw !== video.videoWidth || vh !== video.videoHeight) updateIntrinsics();
+  if (landmarker && video.readyState >= 2) {
+    let ts = performance.now(); if (ts <= lastTs) ts = lastTs + 1; lastTs = ts;
+    try { processHands(landmarker.detectForVideo(video, ts), tc); }
+    catch (e) { console.warn('hand detect failed', e); if (delegate === 'GPU') { delegate = 'CPU'; landmarker = null; createLandmarker('CPU').then((l) => (landmarker = l)).catch(() => {}); } }
+  }
+}
+function startFrameLoop() {
+  const token = ++frameToken;
+  if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+    const cb = (now, meta) => { if (token !== frameToken) return; onVideoFrame(now, meta); video.requestVideoFrameCallback(cb); };
+    video.requestVideoFrameCallback(cb);
+  } else {
+    let last = -1;
+    const cb = () => { if (token !== frameToken) return; if (video.currentTime !== last) { last = video.currentTime; onVideoFrame(performance.now(), null); } requestAnimationFrame(cb); };
+    requestAnimationFrame(cb);
+  }
+}
+
+async function openCamera() {
+  if (stream) { for (const tr of stream.getTracks()) tr.stop(); stream = null; }
+  const video_ = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60, max: 60 } };
+  if (camDeviceId) video_.deviceId = { exact: camDeviceId }; else video_.facingMode = { ideal: 'environment' };
+  stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: video_ });
+  if (!camDeviceId) { // pick the exact rear lens rather than Safari's auto-switching virtual camera
+    try {
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+      const want = S.camera === 'ultra' ? /ultra wide/i : /^back camera$|^rückkamera$|^caméra arrière$/i;
+      const pick = devs.find((d) => want.test(d.label.trim()));
+      const cur = stream.getVideoTracks()[0]?.getSettings().deviceId;
+      if (pick && pick.deviceId && pick.deviceId !== cur) { camDeviceId = pick.deviceId; return openCamera(); }
+      camDeviceId = cur || null;
+    } catch {}
+  }
+  video.srcObject = stream;
+  try { await video.play(); } catch {}
+  await new Promise((r) => (video.readyState >= 1 ? r() : video.addEventListener('loadedmetadata', r, { once: true })));
+  updateIntrinsics();
+  videoPlane.visible = true;
+  startFrameLoop();
+}
+
+function warn(msg) { const w = $('warn'); w.textContent = msg; w.classList.add('show'); }
+let wakeLock = null;
+async function keepAwake() { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && camOn) keepAwake(); });
+
+async function start() {
+  // Motion permission must be requested inside the tap, before anything else awaits.
+  let motionP = Promise.resolve('granted');
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    motionP = DeviceOrientationEvent.requestPermission().catch(() => 'denied');
+  }
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    warn('The camera only works on an https:// address. Host this file (GitHub Pages, Netlify Drop, etc.) and open that link in Safari.');
+    return;
+  }
+  $('btnStart').disabled = true; $('btnStart').textContent = 'Starting…';
+  gyroPerm = await motionP;
+  if (gyroPerm === 'granted') window.addEventListener('deviceorientation', onOrientation);
+  else warn('Motion access was denied, so head tracking is off (drag the view instead). Reload and allow Motion & Orientation access.');
+  try { await openCamera(); }
+  catch (e) {
+    console.warn(e); $('btnStart').disabled = false; $('btnStart').textContent = 'Start';
+    warn('Camera access failed. Allow camera access for this site in Safari settings, then reload.'); return;
+  }
+  camOn = true; keepAwake();
+  camStartT = performance.now();
+  visionReady = loadVision().catch((e) => { console.error(e); warn('Hand tracking model failed to load. Tracking and the sculpture still work.'); return null; });
+  $('btnStart').disabled = false; $('btnStart').textContent = 'Enter headset';
+}
+function showSetup(on) { $('setup').classList.toggle('hidden', !on); if (on) syncSettingsUI(); }
+$('btnStart').addEventListener('click', () => {
+  if (!camOn) start();
+  else { S.mode = 'stereo'; save(); showSetup(false); recenterAt = performance.now() + 3000; }   // time to slide the phone into the headset
+});
+$('btnHand').addEventListener('click', async () => {
+  if (!camOn) await start();
+  if (camOn) { S.mode = 'mono'; save(); showSetup(false); }
+});
+const drag = { id: null, x: 0, y: 0, moved: 0 };   // tap = settings; drag = look around when there is no motion data
+canvas.addEventListener('pointerdown', (e) => { drag.id = e.pointerId; drag.x = e.clientX; drag.y = e.clientY; drag.moved = 0; });
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== drag.id) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+  if (!gyroOk) { manual.yaw += dx * 0.004; manual.pitch = clamp(manual.pitch + dy * 0.004, -1.4, 1.4); }
+});
+canvas.addEventListener('pointerup', (e) => { if (e.pointerId === drag.id && drag.moved < 10) showSetup(true); drag.id = null; });
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+/* ============================================================ interaction */
+const center = new THREE.Vector3(), angVel = new THREE.Vector3();
+let userScale = 1, shownScale = 1, gmode = 'none', lastInteract = 0, idleW = 0, palmsSince = 0;
+const one = { slot: null, v: new THREE.Vector3() }, two = { d0: 1, s0: 1, ang: 0 };
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion();
+function pinchPt(s, out) { return out.addVectors(s.disp[4], s.disp[8]).multiplyScalar(0.5); }
+function palmCenter(s, out) { out.set(0, 0, 0); for (const k of PALM) out.add(s.disp[k]); return out.multiplyScalar(1 / PALM.length); }
+function updateInteraction(dt, t) {
+  sculpt.position.lerp(anchor, 1 - Math.exp(-dt * 6)); center.copy(sculpt.position);
+  const pinchers = slots.filter((s) => s.present && s.gesture === 'pinch');
+  if (pinchers.length >= 2) {
+    pinchPt(pinchers[0], _a); pinchPt(pinchers[1], _b);
+    const d = _a.distanceTo(_b), ang = Math.atan2(_b.x - _a.x, _b.z - _a.z);
+    if (gmode !== 'two') { gmode = 'two'; two.d0 = Math.max(d, 0.03); two.s0 = userScale; two.ang = ang; announce('two', t); }
+    else {
+      userScale = clamp(two.s0 * d / two.d0, 0.3, 4);
+      const da = Math.atan2(Math.sin(ang - two.ang), Math.cos(ang - two.ang)); two.ang = ang;
+      sculpt.quaternion.premultiply(_q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, da));
+    }
+    angVel.set(0, 0, 0);
+  } else if (pinchers.length === 1) {
+    const s = pinchers[0], v = pinchPt(s, _a).sub(center);
+    if (gmode !== 'one' || one.slot !== s) { gmode = 'one'; one.slot = s; one.v.copy(v); angVel.set(0, 0, 0); }
+    else if (v.length() > 0.02 && one.v.length() > 0.02) {
+      _q.setFromUnitVectors(_b.copy(one.v).normalize(), v.clone().normalize());
+      const ang = 2 * Math.acos(clamp(_q.w, -1, 1));
+      if (ang > 1e-5) {
+        const axis = _b.set(_q.x, _q.y, _q.z).normalize(), gain = 1.6;
+        sculpt.quaternion.premultiply(_q.setFromAxisAngle(axis, ang * gain));
+        angVel.lerp(axis.multiplyScalar(clamp(ang * gain / Math.max(dt, 1e-3), 0, 6)), 0.35);
+      }
+      one.v.copy(v);
+    }
+  } else gmode = 'none';
+  if (slots.some((s) => s.present)) lastInteract = t;
+  if (slots.every((s) => s.present && s.gesture === 'palm')) { // hold both open palms up for a second to recenter
+    if (!palmsSince) palmsSince = t;
+    else if (t - palmsSince > 1.0) { recenter(); toast('Recentered'); palmsSince = Infinity; }
+  } else palmsSince = 0;
+  if (gmode === 'none') {
+    const w = angVel.length();
+    if (w > 1e-4) sculpt.quaternion.premultiply(_q.setFromAxisAngle(_b.copy(angVel).normalize(), w * dt));
+    angVel.multiplyScalar(Math.exp(-1.5 * dt));
+    idleW = t - lastInteract > 3 ? Math.min(1, idleW + dt * 0.4) : Math.max(0, idleW - dt * 3);
+    sculpt.quaternion.premultiply(_q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, 0.2 * idleW * dt));
+  }
+  sculpt.quaternion.normalize();
+  shownScale += (userScale - shownScale) * (1 - Math.exp(-dt * 10));
+  sculpt.scale.setScalar(S.sizeCM / 200 * shownScale);
+}
+
+/* ================================================================== forces */
+const forces = []; let nF = 0;
+const qInv = new THREE.Quaternion(), vL = new THREE.Vector3(), vA = new THREE.Vector3(), palmTmp = new THREE.Vector3();
+function addForce(pW, R, strength, type, swirl = 0) { // R in metres; strength in sculpture-local units
+  if (nF === forces.length) forces.push({});
+  const f = forces[nF++], sc = sculpt.scale.x;
+  vL.copy(pW).sub(sculpt.position).applyQuaternion(qInv).divideScalar(sc);
+  vA.copy(pW).sub(rig.position).normalize().applyQuaternion(qInv);
+  f.x = vL.x; f.y = vL.y; f.z = vL.z; f.ax = vA.x; f.ay = vA.y; f.az = vA.z;
+  f.r = R / sc; f.r2 = f.r * f.r; f.s = strength; f.type = type; f.swirl = swirl; f.dw = 0.3;
+}
+function buildForces(t) {
+  nF = 0; qInv.copy(sculpt.quaternion).invert();
+  for (const s of slots) {
+    if (!s.present || s.visA < 0.4) continue;
+    switch (s.gesture) {
+      case 'palm': addForce(palmCenter(s, palmTmp), 0.085, 90, 0); break;
+      case 'fist': addForce(palmCenter(s, palmTmp), 0.2, 30 * clamp((t - s.fistSince) * 2.5, 0.3, 1), 1, 7); break;
+      case 'point': addForce(s.disp[8], 0.035, 80, 0); break;
+      case 'pinch': break;
+      default: for (const k of TIPS) addForce(s.disp[k], 0.022, 45, 0);
+    }
+  }
+  while (blasts.length) {
+    const b = blasts.pop(), c = palmCenter(b.s, palmTmp), sc = sculpt.scale.x;
+    vL.copy(c).sub(sculpt.position).applyQuaternion(qInv).divideScalar(sc);
+    const R = 0.26 / sc, str = 7.5 * b.power;
+    for (let i = 0, j = 0; i < N; i++, j += 3) {
+      const dx = pos[j] - vL.x, dy = pos[j + 1] - vL.y, dz = pos[j + 2] - vL.z, r = Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-3;
+      if (r > R) continue;
+      const k = str * Math.sqrt(1 - r / R) / r;
+      vel[j] += dx * k + gauss() * 0.3; vel[j + 1] += dy * k + gauss() * 0.3; vel[j + 2] += dz * k + gauss() * 0.3;
+    }
+  }
+}
+function simulate(dt) {
+  const K = 7.5, damp = Math.exp(-3.3 * dt), ca = 1 - Math.exp(-dt * 2.5), F = forces, nf = nF, T = tgt, CT = colTgt;
+  for (let i = 0, j = 0; i < N; i++, j += 3) {
+    const px = pos[j], py = pos[j + 1], pz = pos[j + 2], ks = K * stiff[i];
+    let fx_ = (T[j] - px) * ks, fy_ = (T[j + 1] - py) * ks, fz_ = (T[j + 2] - pz) * ks;
+    for (let n = 0; n < nf; n++) {
+      const f = F[n], dx = px - f.x, dy = py - f.y, dz = pz - f.z, al = dx * f.ax + dy * f.ay + dz * f.az;
+      const qx = dx - al * f.ax, qy = dy - al * f.ay, qz = dz - al * f.az, r2 = qx * qx + qy * qy + qz * qz + al * al * f.dw;
+      if (r2 >= f.r2) continue;
+      const r = Math.sqrt(r2) + 1e-3, fall = 1 - r / f.r;
+      if (f.type === 0) { const s = f.s * fall * fall / r; fx_ += qx * s; fy_ += qy * s; fz_ += qz * s; }
+      else {
+        const s = f.s * fall / r, sw = f.swirl * fall;
+        fx_ += -dx * s + (f.ay * dz - f.az * dy) * sw; fy_ += -dy * s + (f.az * dx - f.ax * dz) * sw; fz_ += -dz * s + (f.ax * dy - f.ay * dx) * sw;
+      }
+    }
+    const vx = (vel[j] + fx_ * dt) * damp, vy = (vel[j + 1] + fy_ * dt) * damp, vz = (vel[j + 2] + fz_ * dt) * damp;
+    vel[j] = vx; vel[j + 1] = vy; vel[j + 2] = vz; pos[j] = px + vx * dt; pos[j + 1] = py + vy * dt; pos[j + 2] = pz + vz * dt;
+    const sp = Math.min(1.8, Math.sqrt(vx * vx + vy * vy + vz * vz) * 0.5);
+    for (let c = 0; c < 3; c++) { const b = (colBase[j + c] += (CT[j + c] - colBase[j + c]) * ca); colOut[j + c] = b * (1 + sp) + sp * 0.12; }
+  }
+  posAttr.needsUpdate = true; colAttr.needsUpdate = true;
+}
+function setShape(i) {
+  shapeIdx = (i + SHAPES.length) % SHAPES.length; tgt = SHAPES[shapeIdx].pos; colTgt = SHAPES[shapeIdx].col;
+  for (let j = 0; j < N * 3; j++) vel[j] += gauss() * 0.7;
+}
+
+/* ============================================================ hand render */
+const mTmp = new THREE.Matrix4(), qI = new THREE.Quaternion(), sTmp = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+const dirTmp = new THREE.Vector3(), midTmp = new THREE.Vector3(), qB = new THREE.Quaternion();
+function updateHands(dt, t) {
+  const a = 1 - Math.exp(-dt * 24);
+  for (const s of slots) {
+    const v = s.vis;
+    if (s.present && t - s.lastSeen > 0.4) { s.present = false; s.gesture = 'none'; s.pinch = false; }   // tracker stalled
+    s.visA += ((s.present ? 1 : 0) - s.visA) * (1 - Math.exp(-dt * (s.present ? 14 : 6)));
+    const show = s.visA > 0.01, skel = show && S.skeleton;
+    v.joints.visible = v.bones.visible = skel; v.glow.visible = show;
+    if (!show) { v.pinchRing.visible = v.peace.visible = false; continue; }
+    for (let k = 0; k < 21; k++) s.disp[k].lerp(s.tgt[k], a);
+    s.col.lerp(GCOL[s.gesture] || GCOL.none, 1 - Math.exp(-dt * 10));
+    if (skel) {
+      v.jointMat.color.copy(s.col); v.jointMat.opacity = 0.9 * s.visA; v.boneMat.color.copy(s.col); v.boneMat.opacity = 0.45 * s.visA;
+      for (let k = 0; k < 21; k++) { mTmp.compose(s.disp[k], qI, sTmp.setScalar(TIPS.includes(k) ? 0.0055 : 0.004)); v.joints.setMatrixAt(k, mTmp); }
+      v.joints.instanceMatrix.needsUpdate = true;
+      CONN.forEach(([i, j], c) => {
+        dirTmp.subVectors(s.disp[j], s.disp[i]); const len = dirTmp.length() || 1e-4; dirTmp.divideScalar(len);
+        qB.setFromUnitVectors(UP, dirTmp); midTmp.addVectors(s.disp[i], s.disp[j]).multiplyScalar(0.5);
+        mTmp.compose(midTmp, qB, sTmp.set(0.0018, len, 0.0018)); v.bones.setMatrixAt(c, mTmp);
+      });
+      v.bones.instanceMatrix.needsUpdate = true;
+    }
+    const gp = v.gGeo.attributes.position;
+    TIPS.forEach((k, n) => gp.setXYZ(n, s.disp[k].x, s.disp[k].y, s.disp[k].z));
+    const pc = palmCenter(s, palmTmp); gp.setXYZ(5, pc.x, pc.y, pc.z); gp.needsUpdate = true;
+    let palmSize = 0.035;
+    if (s.gesture === 'fist') palmSize = 0.045 + clamp((t - s.fistSince) * 0.04, 0, 0.05) + Math.sin(t * 14) * 0.005;
+    else if (s.gesture === 'palm') palmSize = 0.07;
+    v.gSize.setX(5, palmSize); v.gSize.needsUpdate = true;
+    v.gMat.uniforms.uColor.value.copy(s.col); v.gMat.uniforms.uOpacity.value = 0.7 * s.visA;
+    if (s.gesture === 'pinch') {
+      v.pinchRing.visible = true; v.pinchRing.position.addVectors(s.disp[4], s.disp[8]).multiplyScalar(0.5);
+      v.pinchRing.quaternion.copy(rig.quaternion); v.pinchRing.scale.setScalar(1 + Math.sin(t * 9) * 0.08); v.pinchRing.material.opacity = 0.9 * s.visA;
+    } else v.pinchRing.visible = false;
+    if (s.present && s.gesture === 'peace' && !s.peaceFired) {
+      const p = clamp((t - s.peaceSince) / 0.7, 0, 1);
+      if (p >= 1) { s.peaceFired = true; v.peace.visible = false; setShape(shapeIdx + 1); toast(SHAPES[shapeIdx].name); }
+      else {
+        v.peace.visible = true; v.peace.material.uniforms.uP.value = p;
+        v.peace.position.addVectors(s.disp[8], s.disp[12]).multiplyScalar(0.5).addScaledVector(_b.set(0, 1, 0).applyQuaternion(rig.quaternion), 0.035);
+        v.peace.quaternion.copy(rig.quaternion);
+      }
+    } else v.peace.visible = false;
+  }
+}
+
+/* ==================================================================== loop */
+let last = performance.now(), fpsT = last, frames = 0, camFramesLast = 0, fps = 0, camHz = 0, gyroHz = 0, ghLast = 0, ghCount = 0;
+function render() {
+  const stereo = S.mode === 'stereo' && $('setup').classList.contains('hidden');
+  const pxU = stereo ? pxPerUnitEye : pxPerUnitMono;
+  pMat.uniforms.uSize.value = pxU * sculpt.scale.x * 0.016;
+  for (const s of slots) s.vis.gMat.uniforms.uPx.value = pxU;
+  renderer.setRenderTarget(null); renderer.clear();
+  if (stereo) {
+    for (const [rt, cam] of [[rtL, camL], [rtR, camR]]) { renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, cam); }
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  } else renderer.render(scene, camC);
+}
+renderer.setAnimationLoop((now) => {
+  const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now;
+  const t = now / 1000;
+  updateHead(now);
+  if (camOn && !placed && (gyroOk || now - camStartT > 800)) recenter();
+  if (recenterAt && now >= recenterAt) { recenterAt = 0; recenter(); }
+  sculpt.visible = placed;
+  if (placed) { // passthrough plane sits at the sculpture's distance so both converge together
+    const d = clamp(rig.position.distanceTo(sculpt.position), 0.2, 3);
+    videoDist += (d - videoDist) * (1 - Math.exp(-dt * 4));
+  }
+  const D = videoDist;
+  camPoseAt(videoTc, videoRig.quaternion, videoRig.position);
+  videoPlane.position.set((cx - vw / 2) / fx * -D, 0, -D);
+  videoPlane.scale.set(D * vw / fx, D * vh / fx, 1);
+  updateHands(dt, t);
+  updateInteraction(dt, t);
+  buildForces(t);
+  simulate(dt);
+  pMat.uniforms.uTime.value = t;
+  if (!camOn) setHud('');
+  else if (recenterAt) setHud(`Placing it ahead of you in ${Math.ceil((recenterAt - now) / 1000)}…`);
+  else if (now < toastUntil) setHud(toastText);
+  else if (!gyroOk && now - camStartT > 2000) setHud('No motion data · allow Motion access');
+  else setHud('');
+  render();
+  if (window.__snap) { // test hook: grab this exact frame plus where the board origin was drawn
+    const o = new THREE.Vector3(0, 0, 0).project(camC);
+    window.__snap({ img: canvas.toDataURL('image/png'), ox: (o.x + 1) / 2 * W, oy: (1 - o.y) / 2 * H, w: W, h: H });
+    window.__snap = null;
+  }
+  frames++;
+  if (now - fpsT > 1000) {
+    const s = (now - fpsT) / 1000;
+    ghCount = GH.filter((g) => g.t > fpsT).length;
+    fps = Math.round(frames / s); camHz = Math.round((camFrames - camFramesLast) / s); gyroHz = Math.round(ghCount / s);
+    frames = 0; camFramesLast = camFrames; fpsT = now;
+    $('status').textContent = !camOn ? 'Not started' :
+      `${fps} fps · camera ${vw}×${vh} @ ${camHz} Hz · FOV ${hfovDeg.toFixed(1)}°\n` +
+      `motion ${gyroOk ? `✓ ${gyroHz} Hz` : gyroPerm === 'denied' ? 'denied' : '–'} · hands ${landmarker ? handCount + ' (' + delegate + ')' : 'loading…'} · 3DoF`;
+  }
+});
+$('status').style.whiteSpace = 'pre-line';
+
+buildSettings();
+resize();
+onSettingsChanged();
+
+// Debug hooks for testing without a headset.
+window.handfield = {
+  S, rig, sculpt, slots, anchor, setShape, recenter, onOrientation, deviceQuat, processHands, headRotAt, NECK,
+  state: () => ({ fx, vw, vh, hfovDeg, gyroOk, handCount, shape: shapeIdx, userScale, placed,
+    pos: rig.position.toArray(), quat: rig.quaternion.toArray(), sculptPos: sculpt.position.toArray(), anchor: anchor.toArray(), camHz }),
+  intrinsics: () => ({ fx, cx, cy, vw, vh }),
+};
+</script>
+</body>
+</html>
